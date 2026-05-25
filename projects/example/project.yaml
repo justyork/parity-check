@@ -1,0 +1,9 @@
+name: example
+base:
+  left: http://localhost:8080
+  right: http://localhost:8081
+defaults:
+  timeout_sec: 30
+  headers:
+    Accept: application/json
+    Content-Type: application/json

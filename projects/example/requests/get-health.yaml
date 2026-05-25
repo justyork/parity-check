@@ -1,0 +1,9 @@
+id: get-health
+method: GET
+path: /health
+query:
+  verbose: "true"
+headers:
+  X-Request-Id: test-1
+ignore_paths:
+  - $.generated_at
