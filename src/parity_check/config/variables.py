@@ -3,9 +3,10 @@ import re
 from pathlib import Path
 from typing import Any
 
+from parity_check.config.random_builtin import is_random_expression, resolve_random_expression
 from parity_check.errors import ConfigError
 
-_VAR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
+_EXPR_PATTERN = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_.]*)\}")
 
 
 def load_dotenv_file(path: Path) -> dict[str, str]:
@@ -116,25 +117,38 @@ def load_env_overlay(project_dir: Path, env_name: str | None) -> dict:
     return _load_env_yaml(env_path)
 
 
-def substitute_value(value: Any, variables: dict[str, str]) -> Any:
+def substitute_value(
+    value: Any,
+    variables: dict[str, str],
+    random_cache: dict[str, str] | None = None,
+) -> Any:
+    cache = random_cache if random_cache is not None else {}
     if isinstance(value, str):
-        return _substitute_string(value, variables)
+        return _substitute_string(value, variables, cache)
     if isinstance(value, dict):
-        return {key: substitute_value(item, variables) for key, item in value.items()}
+        return {
+            key: substitute_value(item, variables, cache) for key, item in value.items()
+        }
     if isinstance(value, list):
-        return [substitute_value(item, variables) for item in value]
+        return [substitute_value(item, variables, cache) for item in value]
     return value
 
 
-def substitute_data(data: dict, variables: dict[str, str]) -> dict:
-    return substitute_value(data, variables)
+def substitute_data(
+    data: dict,
+    variables: dict[str, str],
+    random_cache: dict[str, str] | None = None,
+) -> dict:
+    return substitute_value(data, variables, random_cache)
 
 
-def _substitute_string(text: str, variables: dict[str, str]) -> str:
+def _substitute_string(text: str, variables: dict[str, str], random_cache: dict[str, str]) -> str:
     def replace(match: re.Match[str]) -> str:
         name = match.group(1)
+        if is_random_expression(name):
+            return resolve_random_expression(name, random_cache)
         if name not in variables:
             raise ConfigError(f"Undefined variable: ${{{name}}}")
         return variables[name]
 
-    return _VAR_PATTERN.sub(replace, text)
+    return _EXPR_PATTERN.sub(replace, text)

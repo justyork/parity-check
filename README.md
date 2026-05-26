@@ -135,6 +135,8 @@ parity-check list --project example
 
 Variable precedence: repo `.env` → `projects/<p>/.env` → `vars` in `env/<env>.yaml` → `env/<env>.env` → `--var`.
 
+Built-in random values: `${random.uuid}` (repeat for the same value; use `${random.uuid.2}` for a second independent value). See [docs/request-schema.md](docs/request-schema.md).
+
 Environment name when `--env` is omitted: `PARITY_ENV`, else `dev` if `env/dev.yaml` exists, else the only `env/*.yaml` when there is exactly one.
 
 More detail: [docs/architecture.md](docs/architecture.md), [docs/deployment.md](docs/deployment.md).

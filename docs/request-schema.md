@@ -96,6 +96,38 @@ right:
 
 A missing variable is a configuration error.
 
+### Random values (per request)
+
+Built-in expressions generate values per request definition (shared across all fields and both **left** / **right** sides).
+
+| Expression | Example value |
+|------------|----------------|
+| `${random.uuid}` | `550e8400-e29b-41d4-a716-446655440000` |
+| `${random.uuid4}` | same as `random.uuid` |
+| `${random.hex16}` | 16 hex chars |
+| `${random.hex32}` | 32 hex chars |
+
+**One value** — repeat the same expression (all `${random.uuid}` in a file share one value):
+
+```yaml
+path: /users/${random.uuid}/session
+headers:
+  X-Request-Id: ${random.uuid}
+body:
+  user_id: ${random.uuid}
+```
+
+**Two different values** — add a numeric suffix (each suffix is its own slot):
+
+```yaml
+path: /users/${random.uuid}/friends/${random.uuid.2}
+body:
+  owner_id: ${random.uuid}
+  friend_id: ${random.uuid.2}
+```
+
+`${random.uuid}` and `${random.uuid.2}` are independent; `${random.uuid.2}` and `${random.uuid.3}` are independent as well. A new set of values is generated for each request file in a run.
+
 ---
 
 ## `project.yaml`

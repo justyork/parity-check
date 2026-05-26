@@ -69,7 +69,7 @@ def load_project(
     if resolved_env is not None:
         env_data = load_env_overlay(project_dir, resolved_env)
         project_data = apply_env_to_project_data(project_data, env_data)
-        project_data = substitute_data(project_data, variables)
+        project_data = substitute_data(project_data, variables, random_cache={})
 
     try:
         config = ProjectConfig.model_validate(project_data)
@@ -98,7 +98,7 @@ def load_project(
         request_data = _load_yaml(request_file)
         if "id" not in request_data:
             request_data["id"] = request_file.stem
-        request_data = substitute_data(request_data, variables)
+        request_data = substitute_data(request_data, variables, random_cache={})
         try:
             request_config = RequestConfig.model_validate(request_data)
         except Exception as exc:
