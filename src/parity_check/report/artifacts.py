@@ -47,6 +47,7 @@ class RunSummary:
     skipped: int = 0
     exit_code: int = 0
     request_filter: str | None = None
+    tag_filter: list[str] | None = None
 
 
 def _snapshot(url: str, response: HttpResponse) -> ResponseSnapshot:
@@ -90,6 +91,7 @@ class RunArtifactsWriter:
         right_domain: str,
         mode: str,
         request_filter: str | None = None,
+        tag_filter: list[str] | None = None,
     ) -> None:
         run_name = build_run_directory_name(env_name)
         self.run_dir = output_dir / project / run_name
@@ -106,6 +108,7 @@ class RunArtifactsWriter:
             right_domain=right_domain,
             started_at=datetime.now(UTC).isoformat(),
             request_filter=request_filter,
+            tag_filter=tag_filter,
         )
 
     @property

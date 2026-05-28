@@ -33,3 +33,18 @@ def test_load_project_single_request():
 def test_load_project_missing_request():
     with pytest.raises(ConfigError, match="not found"):
         load_project(PROJECTS_DIR, "example", request_id="missing")
+
+
+def test_load_yaml_syntax_error(tmp_path: Path) -> None:
+    project_dir = tmp_path / "demo"
+    (project_dir / "requests").mkdir(parents=True)
+    (project_dir / "project.yaml").write_text(
+        "name: demo\nbase:\n  left: http://left.local\n  right: http://right.local\n",
+        encoding="utf-8",
+    )
+    (project_dir / "requests" / "broken.yaml").write_text(
+        "id: broken\nmethod: GET\npath: /x\nbody:\n  key: value: bad\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError, match="Invalid YAML"):
+        load_project(tmp_path, "demo")

@@ -3,6 +3,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
+from parity_check.config.tags import normalize_tags
+
 
 class HttpMethod(StrEnum):
     GET = "GET"
@@ -60,8 +62,14 @@ class RequestConfig(BaseModel):
     left: SideOverride | None = None
     right: SideOverride | None = None
     ignore_paths: list[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
     skip: bool = False
     skip_reason: str | None = None
+
+    @field_validator("tags", mode="before")
+    @classmethod
+    def parse_tags(cls, value: object) -> list[str]:
+        return normalize_tags(value)
 
     @field_validator("path")
     @classmethod

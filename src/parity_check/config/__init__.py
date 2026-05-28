@@ -1,6 +1,7 @@
 from parity_check.config.loader import (
     list_environments,
     list_projects,
+    list_request_tags,
     list_requests,
     load_project,
 )
@@ -14,5 +15,6 @@ __all__ = [
     "load_project",
     "list_environments",
     "list_projects",
+    "list_request_tags",
     "list_requests",
 ]

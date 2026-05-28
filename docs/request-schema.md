@@ -194,10 +194,32 @@ ignore_paths:
 | `left` | no | SideOverride | Overrides for left only |
 | `right` | no | SideOverride | Overrides for right only |
 | `ignore_paths` | no | list[string] | JSONPath fields excluded from response body comparison |
+| `tags` | no | string or list[string] | Labels for selective runs (`--tag` / `-t` on CLI) |
 | `skip` | no | bool | `true` — skip on full project run (default: `false`) |
 | `skip_reason` | no | string | Skip reason shown in console output |
 
 With explicit `--request <id>`, the request runs even when `skip: true`.
+
+### `tags`
+
+Optional string or list of strings. Tag names must match `[A-Za-z0-9][A-Za-z0-9._-]*` (letters, digits, `.`, `-`, `_`).
+
+```yaml
+tags: smoke
+```
+
+```yaml
+tags:
+  - smoke
+  - android
+```
+
+On `parity-check run`, `--tag` / `-t` may be repeated. A request runs if it has **any** of the tags passed on the CLI (OR). Requests without `tags` are not included when filtering. Combine with `--request` only when that request carries a matching tag.
+
+```bash
+parity-check run --project example --tag smoke
+parity-check run --project example -t smoke -t android
+```
 
 ### `body`
 

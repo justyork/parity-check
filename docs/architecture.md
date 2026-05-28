@@ -4,6 +4,8 @@
 
 `parity-check` is a CLI tool for regression comparison of HTTP responses from two APIs (for example, a legacy service and a new implementation).
 
+For Cursor agents authoring request YAML aligned with `config/` and `requests/`, see [`.cursor/skills/parity-check-author-requests/SKILL.md`](../.cursor/skills/parity-check-author-requests/SKILL.md).
+
 ## Flow
 
 ```

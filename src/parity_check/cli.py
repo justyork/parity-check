@@ -7,9 +7,11 @@ from parity_check.compare.diff import compare_responses
 from parity_check.config.loader import (
     list_environments,
     list_projects,
+    list_request_tags,
     list_requests,
     load_project,
 )
+from parity_check.config.tags import normalize_tags
 from parity_check.config.variables import resolve_env_name
 from parity_check.errors import ConfigError, ParityCheckError, RequestError
 from parity_check.http.client import resolve_side_request
@@ -85,9 +87,15 @@ def list_cmd(
         console.print("Environments:")
         for env_name in env_names:
             console.print(f"  {env_name}")
+    request_tags = list_request_tags(directory, project)
     console.print("Requests:")
     for request_id in request_ids:
-        console.print(f"  {request_id}")
+        tags = request_tags.get(request_id, [])
+        if tags:
+            tag_suffix = " [" + ", ".join(tags) + "]"
+        else:
+            tag_suffix = ""
+        console.print(f"  {request_id}{tag_suffix}")
 
 
 @app.command("run")
@@ -96,6 +104,14 @@ def run_cmd(
     request: Annotated[
         str | None,
         typer.Option("--request", "-r", help="Run a single request by id"),
+    ] = None,
+    tag: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--tag",
+            "-t",
+            help="Run requests that have this tag (repeatable; OR semantics)",
+        ),
     ] = None,
     left: Annotated[
         str | None,
@@ -154,14 +170,18 @@ def run_cmd(
 
     try:
         cli_vars = _parse_cli_vars(var)
+        filter_tags: list[str] | None = None
+        if tag:
+            filter_tags = normalize_tags(tag)
         loaded = load_project(
             directory,
             project,
             request_id=request,
             env_name=env,
             cli_vars=cli_vars or None,
+            tags=filter_tags,
         )
-    except ConfigError as exc:
+    except (ConfigError, ValueError) as exc:
         console.print(f"[red]Config error:[/red] {exc}")
         raise typer.Exit(code=2) from exc
 
@@ -189,6 +209,7 @@ def run_cmd(
             right_domain=right_label,
             mode=mode,
             request_filter=request,
+            tag_filter=filter_tags,
         )
 
     print_comparison_endpoints(project_config.base.left, project_config.base.right)

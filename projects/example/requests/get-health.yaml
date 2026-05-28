@@ -1,6 +1,8 @@
 id: get-health
 method: GET
 path: /health
+tags:
+  - smoke
 query:
   verbose: "true"
 headers:

@@ -71,6 +71,7 @@ projects/
 | `headers` | Additional headers |
 | `left` / `right` | Per-side overrides: `url`, `path`, `headers`, `body`, `query` |
 | `ignore_paths` | JSONPath fields excluded from comparison |
+| `tags` | String or list of tags for selective runs (`--tag` on CLI) |
 | `skip` | Skip on full project run (`skip_reason` is shown in output) |
 
 JSON object key order in responses is ignored during comparison. Array element order is significant.
@@ -83,6 +84,7 @@ JSON object key order in responses is ignored during comparison. Array element o
 | `parity-check list -p <name>` | List requests in a project |
 | `parity-check run -p <name>` | Run all requests |
 | `parity-check run -p <name> -r <id>` | Run one request |
+| `parity-check run -p <name> -t <tag>` | Run requests with this tag (repeatable, OR) |
 
 Global flags: `--projects-dir` (default `./projects`).
 
@@ -97,6 +99,7 @@ Global flags: `--projects-dir` (default `./projects`).
 | `--var` | Variable `KEY=VALUE` (overrides `.env` and `env/*.yaml`) |
 | `--side` | `left` or `right` — single service only, no comparison (debug) |
 | `--show-headers` | With `--side`: also print response headers (request headers always shown) |
+| `--tag`, `-t` | Run only requests that have this tag (repeatable; OR semantics) |
 | `-o`, `--output-dir` | Save run results to a directory (console-only without the flag) |
 
 ### Saving results
@@ -142,6 +145,13 @@ Environment name when `--env` is omitted: `PARITY_ENV`, else `dev` if `env/dev.y
 More detail: [docs/architecture.md](docs/architecture.md), [docs/deployment.md](docs/deployment.md).
 
 YAML request schema (for LLM-assisted authoring): [docs/request-schema.md](docs/request-schema.md).
+
+## Cursor skills
+
+Cursor agent skills in this repository:
+
+- [parity-check-run](.cursor/skills/parity-check-run/SKILL.md) — install, `list`/`run`, env vars, `--side`, and run artifacts
+- [parity-check-author-requests](.cursor/skills/parity-check-author-requests/SKILL.md) — author `project.yaml` and `requests/*.yaml` (OpenAPI, curl, code, or descriptions)
 
 ## Tests
 

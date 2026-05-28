@@ -2,6 +2,8 @@
 
 `parity-check` is a local CLI with no server component. Deployment is limited to installing it in a virtual environment.
 
+For Cursor agents installing and running the CLI, see [`.cursor/skills/parity-check-run/SKILL.md`](../.cursor/skills/parity-check-run/SKILL.md).
+
 ## Local installation
 
 ```bash
