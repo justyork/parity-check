@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from typing import Any
 
 import httpx
@@ -6,19 +5,9 @@ import httpx
 from parity_check.config.models import HttpMethod, ProjectConfig, RequestConfig
 from parity_check.errors import RequestError
 from parity_check.http.client import resolve_side_request
+from parity_check.transport.response import RequestPairResult, SideResponse
 
-
-@dataclass(frozen=True)
-class HttpResponse:
-    status_code: int
-    body_text: str
-    headers: dict[str, str]
-
-
-@dataclass(frozen=True)
-class RequestPairResult:
-    left: HttpResponse
-    right: HttpResponse
+HttpResponse = SideResponse
 
 
 class HttpRunner:
@@ -31,7 +20,7 @@ class HttpRunner:
         method: HttpMethod,
         headers: dict[str, str],
         body: Any | None,
-    ) -> HttpResponse:
+    ) -> SideResponse:
         request_kwargs: dict[str, Any] = {
             "method": method.value,
             "url": url,
@@ -50,10 +39,13 @@ class HttpRunner:
         except httpx.HTTPError as exc:
             raise RequestError(f"Request failed for {url}: {exc}") from exc
 
-        return HttpResponse(
+        return SideResponse(
             status_code=response.status_code,
             body_text=response.text,
             headers=dict(response.headers),
+            protocol="http",
+            endpoint=url,
+            raw_status=str(response.status_code),
         )
 
 
@@ -61,7 +53,7 @@ def run_request_side(
     project: ProjectConfig,
     request: RequestConfig,
     side: str,
-) -> tuple[str, HttpMethod, dict[str, str], Any | None, HttpResponse]:
+) -> tuple[str, HttpMethod, dict[str, str], Any | None, SideResponse]:
     if side not in ("left", "right"):
         raise ValueError(f"side must be 'left' or 'right', got: {side}")
 

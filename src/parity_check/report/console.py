@@ -9,19 +9,25 @@ from rich.rule import Rule
 from rich.syntax import Syntax
 
 from parity_check.compare.diff import ComparisonResult
-from parity_check.config.models import HttpMethod
-from parity_check.http.runner import HttpResponse
 from parity_check.report.labels import endpoint_domain
+from parity_check.transport.response import SideRequest, SideResponse
 
 console = Console(stderr=True)
 
 
-def print_comparison_endpoints(left_base: str, right_base: str) -> None:
+def print_comparison_endpoints(
+    left_base: str,
+    right_base: str,
+    left_protocol: str | None = None,
+    right_protocol: str | None = None,
+) -> None:
+    left_suffix = f" [dim]({left_protocol})[/dim]" if left_protocol else ""
+    right_suffix = f" [dim]({right_protocol})[/dim]" if right_protocol else ""
     console.print()
     console.print("[bold]Endpoints[/bold]")
-    console.print(f"  [blue]left[/blue]   {endpoint_domain(left_base)}")
+    console.print(f"  [blue]left[/blue]   {endpoint_domain(left_base)}{left_suffix}")
     console.print(f"          [dim]{left_base}[/dim]")
-    console.print(f"  [magenta]right[/magenta]  {endpoint_domain(right_base)}")
+    console.print(f"  [magenta]right[/magenta]  {endpoint_domain(right_base)}{right_suffix}")
     console.print(f"          [dim]{right_base}[/dim]")
     console.print(Rule(style="dim"))
     console.print()
@@ -73,32 +79,35 @@ def print_side_response(
     project_name: str,
     request_id: str,
     side: str,
-    url: str,
-    method: HttpMethod,
-    request_headers: dict[str, str],
-    request_body: Any | None,
-    response: HttpResponse,
+    side_request: SideRequest,
+    response: SideResponse,
     show_headers: bool = False,
 ) -> None:
+    is_grpc = side_request.protocol == "grpc"
+    headers_label = "request metadata" if is_grpc else "request headers"
+    response_headers_label = "response metadata" if is_grpc else "response headers"
+    body_label = "request message" if is_grpc else "request body"
+
     label = f"{project_name}/{request_id}"
     console.print()
     console.print(f"[cyan][{side.upper()}][/cyan] [bold]{label}[/bold]")
-    console.print(f"  {method.value} {url}")
-    _print_headers_block("request headers", request_headers)
-    if method.value not in ("GET", "HEAD") and request_body is not None:
-        request_body_formatted = _format_request_body(request_body)
+    console.print(f"  [dim]{side_request.protocol}[/dim] {side_request.operation}")
+    console.print(f"  {side_request.endpoint}")
+    _print_headers_block(headers_label, side_request.headers)
+    if side_request.body is not None:
+        request_body_formatted = _format_request_body(side_request.body)
         if request_body_formatted.startswith("{") or request_body_formatted.startswith("["):
-            console.print("  request body:")
+            console.print(f"  {body_label}:")
             console.print(
                 Syntax(request_body_formatted, "json", theme="monokai", line_numbers=False)
             )
         else:
-            console.print("  request body:")
+            console.print(f"  {body_label}:")
             for line in request_body_formatted.splitlines():
                 console.print(f"    {line}")
-    console.print(f"  status: {response.status_code}")
+    console.print(f"  status: {response.display_status}")
     if show_headers:
-        _print_headers_block("response headers", response.headers)
+        _print_headers_block(response_headers_label, response.headers)
     body_formatted = _format_body(response.body_text)
     if body_formatted.startswith("{") or body_formatted.startswith("["):
         console.print("  response body:")

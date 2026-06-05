@@ -15,6 +15,11 @@ class HttpMethod(StrEnum):
     HEAD = "HEAD"
 
 
+class Protocol(StrEnum):
+    HTTP = "http"
+    GRPC = "grpc"
+
+
 class BaseUrls(BaseModel):
     left: str
     right: str
@@ -25,9 +30,27 @@ class BaseUrls(BaseModel):
         return value.rstrip("/")
 
 
+class SidesConfig(BaseModel):
+    left: Protocol | None = None
+    right: Protocol | None = None
+
+
+class GrpcRequest(BaseModel):
+    service: str | None = None
+    method: str | None = None
+    message: Any | None = None
+    metadata: dict[str, str] = Field(default_factory=dict)
+
+
+class GrpcProjectConfig(BaseModel):
+    proto_dir: str = "proto"
+    json_preserving_proto_field_name: bool = True
+
+
 class DefaultsConfig(BaseModel):
     timeout_sec: float = 30.0
     headers: dict[str, str] = Field(default_factory=dict)
+    sides: SidesConfig | None = None
 
 
 class SideOverride(BaseModel):
@@ -36,12 +59,15 @@ class SideOverride(BaseModel):
     headers: dict[str, str] | None = None
     body: Any | None = None
     query: dict[str, str] | None = None
+    protocol: Protocol | None = None
+    grpc: GrpcRequest | None = None
 
 
 class ProjectConfig(BaseModel):
     name: str
     base: BaseUrls
     defaults: DefaultsConfig = Field(default_factory=DefaultsConfig)
+    grpc: GrpcProjectConfig | None = None
 
     def with_base_overrides(self, left: str | None, right: str | None) -> "ProjectConfig":
         data = self.model_dump()
@@ -54,11 +80,12 @@ class ProjectConfig(BaseModel):
 
 class RequestConfig(BaseModel):
     id: str
-    method: HttpMethod
-    path: str
+    method: HttpMethod | None = None
+    path: str | None = None
     body: Any | None = None
     query: dict[str, str] = Field(default_factory=dict)
     headers: dict[str, str] = Field(default_factory=dict)
+    grpc: GrpcRequest | None = None
     left: SideOverride | None = None
     right: SideOverride | None = None
     ignore_paths: list[str] = Field(default_factory=list)
@@ -73,7 +100,9 @@ class RequestConfig(BaseModel):
 
     @field_validator("path")
     @classmethod
-    def path_must_start_with_slash(cls, value: str) -> str:
+    def path_must_start_with_slash(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         if not value.startswith("/"):
             return f"/{value}"
         return value

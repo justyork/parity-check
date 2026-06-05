@@ -1,163 +1,116 @@
 # parity-check
 
-CLI to compare HTTP responses from two APIs (left vs right). Requests are defined in YAML per project.
+**Compare two API implementations side by side** — legacy vs new, HTTP vs HTTP, or HTTP vs gRPC — from the terminal. Define scenarios in YAML; no application code required to write tests.
 
-Requires Python 3.11+.
+```
+  left (reference)          right (candidate)
+        │                          │
+        ▼                          ▼
+   HTTP or gRPC              HTTP or gRPC
+        │                          │
+        └──────── compare ─────────┘
+                 status + JSON body
+```
 
-## Installation
+| | |
+|---|---|
+| **Use cases** | Regression after refactor, API migration (HTTP → gRPC), smoke tests in CI |
+| **Config** | YAML projects under `projects/` |
+| **Runtime** | Python 3.11+ (CLI tool — you do not write Python to use it) |
+| **License** | MIT |
+
+## See it work
+
+### HTTP vs HTTP — same host, different paths
 
 ```bash
-cd parity-check
-python -m venv .venv
-source .venv/bin/activate
+python projects/example/demo_servers.py          # terminal 1
+parity-check run --project example --env local   # terminal 2
+```
+
+![HTTP comparison](docs/images/parity_example_http.png)
+
+### HTTP vs gRPC — migration parity
+
+```bash
+python projects/example-grpc/demo_servers.py
+parity-check run --project example-grpc --env local --verbose
+```
+
+![HTTP vs gRPC comparison](docs/images/parity_example_grpc.png)
+
+More screenshots and step-by-step setup: **[Getting started](docs/getting-started.md)**
+
+## Install
+
+```bash
+git clone <repository-url> parity-check && cd parity-check
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
+parity-check --help
 ```
 
-See [docs/deployment.md](docs/deployment.md) for local setup details.
+Other install paths (pipx, CI): [docs/deployment.md](docs/deployment.md)
 
-## Quick start
+## Quick reference
 
 ```bash
-# list projects
-parity-check list
-
-# list requests in a project
-parity-check list --project example
-
-# run all requests in a project
-parity-check run --project example \
-  --left http://localhost:8080 \
-  --right http://localhost:8081
-
-# run a single request
-parity-check run --project example --request get-health \
-  --left http://localhost:8080 \
-  --right http://localhost:8081
+parity-check list                              # all projects
+parity-check list --project example            # requests + environments
+parity-check run --project example --env local # compare left vs right
+parity-check run -p example -r get-health      # single request
+parity-check run -p example --side right       # debug one side only
 ```
 
-Exit codes: `0` — match, `1` — differences found, `2` — configuration or network error.
+**Exit codes:** `0` match · `1` differences · `2` config or connection error
 
-## Project layout
+## How it is organized
 
 ```
 projects/
-  <project-name>/
-    project.yaml          # base URLs, defaults
-    .env                  # optional local variables
+  <your-api>/
+    project.yaml       # base URLs, defaults, protocol per side
     env/
-      dev.yaml            # base + vars for an environment
+      staging.yaml     # environment overrides + ${VAR} values
     requests/
-      <request-id>.yaml   # one HTTP request (${VAR} in fields)
+      get-user.yaml    # one scenario = one comparison
+    proto/             # gRPC only: .proto contract files
 ```
 
-### project.yaml
+- **left** — usually the reference (legacy) service  
+- **right** — the implementation under test  
+- **ignore_paths** — JSON fields excluded from body diff (timestamps, ids, …)
 
-| Field | Description |
-|-------|-------------|
-| `name` | Project name (matches the directory name) |
-| `base.left` / `base.right` | Base URLs for each side |
-| `defaults.timeout_sec` | HTTP timeout |
-| `defaults.headers` | Shared headers |
+Concepts in plain language: [docs/concepts.md](docs/concepts.md)  
+Full YAML reference: [docs/request-schema.md](docs/request-schema.md)  
+Bundled demos: [docs/examples.md](docs/examples.md)
 
-### requests/*.yaml
+## gRPC and mixed HTTP↔gRPC
 
-| Field | Description |
-|-------|-------------|
-| `id` | Identifier for `--request` (defaults to the filename without `.yaml`) |
-| `method` | GET, POST, PUT, PATCH, DELETE, HEAD |
-| `path` | Path relative to the base URL |
-| `body` | JSON body (for POST/PUT/PATCH) |
-| `query` | Query parameters |
-| `headers` | Additional headers |
-| `left` / `right` | Per-side overrides: `url`, `path`, `headers`, `body`, `query` |
-| `ignore_paths` | JSONPath fields excluded from comparison |
-| `tags` | String or list of tags for selective runs (`--tag` on CLI) |
-| `skip` | Skip on full project run (`skip_reason` is shown in output) |
+Mark a side as gRPC via `defaults.sides` or `left.protocol` / `right.protocol`. Put `.proto` files in `projects/<name>/proto/`. gRPC status is normalized to HTTP codes for comparison; response messages are compared as JSON. See `projects/example-grpc/` and [ADR-0001](docs/adr/0001-grpc-and-mixed-protocol-parity.md).
 
-JSON object key order in responses is ignored during comparison. Array element order is significant.
+## Documentation
 
-## CLI
+| Doc | Description |
+|-----|-------------|
+| [docs/README.md](docs/README.md) | Documentation index |
+| [Getting started](docs/getting-started.md) | Install + demos with screenshots |
+| [Concepts](docs/concepts.md) | Projects, requests, left/right, comparison rules |
+| [Examples](docs/examples.md) | `example` and `example-grpc` walkthrough |
+| [Request schema](docs/request-schema.md) | Complete YAML specification |
+| [Deployment](docs/deployment.md) | CI, env vars, pre-release checks |
+| [Architecture](docs/architecture.md) | Modules and internals (contributors) |
 
-| Command | Description |
-|---------|-------------|
-| `parity-check list` | List projects |
-| `parity-check list -p <name>` | List requests in a project |
-| `parity-check run -p <name>` | Run all requests |
-| `parity-check run -p <name> -r <id>` | Run one request |
-| `parity-check run -p <name> -t <tag>` | Run requests with this tag (repeatable, OR) |
-
-Global flags: `--projects-dir` (default `./projects`).
-
-`run` flags:
-
-| Flag | Description |
-|------|-------------|
-| `--left` | Override left base URL from `project.yaml` |
-| `--right` | Override right base URL from `project.yaml` |
-| `--verbose`, `-v` | Print URL and method for each request before execution |
-| `--env`, `-e` | Environment: `projects/<p>/env/<name>.yaml` (or `PARITY_ENV`) |
-| `--var` | Variable `KEY=VALUE` (overrides `.env` and `env/*.yaml`) |
-| `--side` | `left` or `right` — single service only, no comparison (debug) |
-| `--show-headers` | With `--side`: also print response headers (request headers always shown) |
-| `--tag`, `-t` | Run only requests that have this tag (repeatable; OR semantics) |
-| `-o`, `--output-dir` | Save run results to a directory (console-only without the flag) |
-
-### Saving results
-
-With `-o ./output`, a run is stored under `output/<project>/<timestamp>_<env>/`:
-
-```
-output/my-api/20260525_143022_dev/
-  summary.json       # counters, endpoints, exit code
-  meta.json
-  requests/
-    get-health.json   # left/right responses, diff, outcome
-```
-
-`outcome`: `ok`, `fail`, `error`, `skipped`, `debug`.
-
-### Variables and environments
-
-```bash
-# dev: base from env/dev.yaml + vars, ${VAR} substitution in requests
-parity-check run --project example --env dev
-
-# override one variable
-parity-check run --project example --env dev --var USER_ID=other-uuid
-
-# debug: left side only
-parity-check run --project example --env dev -r get-health --side left
-parity-check run --project example --env dev -r get-health --side right --show-headers
-
-# save run artifacts
-parity-check run --project example --env dev -o ./output
-
-# list environment files for a project
-parity-check list --project example
-```
-
-Variable precedence: repo `.env` → `projects/<p>/.env` → `vars` in `env/<env>.yaml` → `env/<env>.env` → `--var`.
-
-Built-in random values: `${random.uuid}` (repeat for the same value; use `${random.uuid.2}` for a second independent value). See [docs/request-schema.md](docs/request-schema.md).
-
-Environment name when `--env` is omitted: `PARITY_ENV`, else `dev` if `env/dev.yaml` exists, else the only `env/*.yaml` when there is exactly one.
-
-More detail: [docs/architecture.md](docs/architecture.md), [docs/deployment.md](docs/deployment.md).
-
-YAML request schema (for LLM-assisted authoring): [docs/request-schema.md](docs/request-schema.md).
-
-## Cursor skills
-
-Cursor agent skills in this repository:
-
-- [parity-check-run](.cursor/skills/parity-check-run/SKILL.md) — install, `list`/`run`, env vars, `--side`, and run artifacts
-- [parity-check-author-requests](.cursor/skills/parity-check-author-requests/SKILL.md) — author `project.yaml` and `requests/*.yaml` (OpenAPI, curl, code, or descriptions)
-
-## Tests
+## Development
 
 ```bash
 pytest
+ruff check src tests
 ```
+
+## Cursor skills
+
+Agent skills for authoring and running tests live in [.cursor/skills/](.cursor/skills/).
 
 ## License
 

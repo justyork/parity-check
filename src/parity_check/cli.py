@@ -14,8 +14,6 @@ from parity_check.config.loader import (
 from parity_check.config.tags import normalize_tags
 from parity_check.config.variables import resolve_env_name
 from parity_check.errors import ConfigError, ParityCheckError, RequestError
-from parity_check.http.client import resolve_side_request
-from parity_check.http.runner import run_request_pair, run_request_side
 from parity_check.report.artifacts import RunArtifactsWriter
 from parity_check.report.console import (
     console,
@@ -27,6 +25,10 @@ from parity_check.report.console import (
     terminate,
 )
 from parity_check.report.labels import endpoint_domain
+from parity_check.transport.run_pair import (
+    run_request_pair,
+    run_request_side,
+)
 
 app = typer.Typer(
     name="parity-check",
@@ -197,6 +199,10 @@ def run_cmd(
     resolved_env = resolve_env_name(project_dir, env)
     mode = "debug" if side else "compare"
 
+    sides_cfg = project_config.defaults.sides
+    left_protocol = sides_cfg.left.value if sides_cfg and sides_cfg.left else None
+    right_protocol = sides_cfg.right.value if sides_cfg and sides_cfg.right else None
+
     artifacts: RunArtifactsWriter | None = None
     if output_dir is not None:
         artifacts = RunArtifactsWriter(
@@ -212,7 +218,12 @@ def run_cmd(
             tag_filter=filter_tags,
         )
 
-    print_comparison_endpoints(project_config.base.left, project_config.base.right)
+    print_comparison_endpoints(
+        project_config.base.left,
+        project_config.base.right,
+        left_protocol,
+        right_protocol,
+    )
 
     for request_config in loaded.requests:
         label = f"{project}/{request_config.id}"
@@ -225,38 +236,38 @@ def run_cmd(
 
         try:
             if side is not None:
-                url, method, request_headers, request_body, response = run_request_side(
-                    project_config, request_config, side
+                side_request, response = run_request_side(
+                    project_config, request_config, side, project_dir
                 )
                 print_side_response(
                     project,
                     request_config.id,
                     side,
-                    url,
-                    method,
-                    request_headers,
-                    request_body,
+                    side_request,
                     response,
                     show_headers=show_headers,
                 )
                 if artifacts is not None:
                     artifacts.record_debug_side(
-                        request_config.id, side, method, url, response
+                        request_config.id,
+                        side,
+                        request_config.method,
+                        side_request.endpoint,
+                        response,
                     )
                 passed += 1
                 continue
 
-            left_url, method, _, _, _ = resolve_side_request(
-                "left", project_config, request_config
-            )
-            right_url, _, _, _, _ = resolve_side_request(
-                "right", project_config, request_config
-            )
+            pair_result = run_request_pair(project_config, request_config, project_dir)
+            left_request = pair_result.left_request
+            right_request = pair_result.right_request
 
-            if verbose:
-                console.print(f"[dim]{label}: {method.value} {left_url} | {right_url}[/dim]")
+            if verbose and left_request is not None and right_request is not None:
+                console.print(
+                    f"[dim]{label}: {left_request.operation} {left_request.endpoint} "
+                    f"| {right_request.operation} {right_request.endpoint}[/dim]"
+                )
 
-            pair_result = run_request_pair(project_config, request_config)
             comparison = compare_responses(
                 pair_result.left,
                 pair_result.right,
@@ -268,9 +279,9 @@ def run_cmd(
             if artifacts is not None:
                 artifacts.record_comparison(
                     request_config.id,
-                    method,
-                    left_url,
-                    right_url,
+                    request_config.method,
+                    left_request.endpoint if left_request else "",
+                    right_request.endpoint if right_request else "",
                     pair_result.left,
                     pair_result.right,
                     comparison,

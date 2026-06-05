@@ -6,6 +6,20 @@ def _response(status: int, body: str) -> HttpResponse:
     return HttpResponse(status_code=status, body_text=body, headers={})
 
 
+def test_compare_equal_json_same_url_different_query_param_order():
+    left = _response(
+        200,
+        '{"dialogUri": "https://example.com/path?gdprApplies=1&eeaApplies=1&name=HappyColor"}',
+    )
+    right = _response(
+        200,
+        '{"dialogUri": "https://example.com/path?eeaApplies=1&gdprApplies=1&name=HappyColor"}',
+    )
+    result = compare_responses(left, right)
+    assert result.equal
+    assert result.body_equal
+
+
 def test_compare_equal_json_different_key_order():
     left = _response(200, '{"b": 2, "a": 1}')
     right = _response(200, '{"a": 1, "b": 2}')

@@ -6,7 +6,7 @@ from typing import Any
 
 from parity_check.compare.diff import ComparisonResult
 from parity_check.config.models import HttpMethod
-from parity_check.http.runner import HttpResponse
+from parity_check.transport.response import SideResponse
 
 
 @dataclass
@@ -15,6 +15,8 @@ class ResponseSnapshot:
     status_code: int
     headers: dict[str, str]
     body_text: str
+    protocol: str = "http"
+    raw_status: str = ""
 
 
 @dataclass
@@ -50,12 +52,14 @@ class RunSummary:
     tag_filter: list[str] | None = None
 
 
-def _snapshot(url: str, response: HttpResponse) -> ResponseSnapshot:
+def _snapshot(url: str, response: SideResponse) -> ResponseSnapshot:
     return ResponseSnapshot(
         url=url,
         status_code=response.status_code,
         headers=response.headers,
         body_text=response.body_text,
+        protocol=response.protocol,
+        raw_status=response.display_status,
     )
 
 
@@ -128,11 +132,11 @@ class RunArtifactsWriter:
     def record_comparison(
         self,
         request_id: str,
-        method: HttpMethod,
+        method: HttpMethod | None,
         left_url: str,
         right_url: str,
-        left_response: HttpResponse,
-        right_response: HttpResponse,
+        left_response: SideResponse,
+        right_response: SideResponse,
         comparison: ComparisonResult,
     ) -> None:
         if comparison.equal:
@@ -146,7 +150,7 @@ class RunArtifactsWriter:
             RequestRunRecord(
                 request_id=request_id,
                 outcome=outcome,
-                method=method.value,
+                method=method.value if method else None,
                 left=_snapshot(left_url, left_response),
                 right=_snapshot(right_url, right_response),
                 comparison=_comparison_to_dict(comparison),
@@ -167,16 +171,16 @@ class RunArtifactsWriter:
         self,
         request_id: str,
         side: str,
-        method: HttpMethod,
+        method: HttpMethod | None,
         url: str,
-        response: HttpResponse,
+        response: SideResponse,
     ) -> None:
         self._summary.passed += 1
         snapshot = _snapshot(url, response)
         record = RequestRunRecord(
             request_id=request_id,
             outcome="debug",
-            method=method.value,
+            method=method.value if method else None,
             side=side,
         )
         if side == "left":

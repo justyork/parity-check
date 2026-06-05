@@ -1,0 +1,13 @@
+id: say-hello
+method: GET
+path: /hello
+query:
+  name: ${NAME}
+right:
+  grpc:
+    service: parity.example.v1.Greeter
+    method: SayHello
+    message:
+      name: ${NAME}
+ignore_paths:
+  - $.code

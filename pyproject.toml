@@ -5,11 +5,11 @@ build-backend = "hatchling.build"
 [project]
 name = "parity-check"
 version = "0.1.0"
-description = "CLI tool to compare HTTP responses from two API services"
+description = "CLI tool to compare HTTP and gRPC responses from two API services"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
-keywords = ["api", "parity", "regression", "http", "cli", "testing"]
+keywords = ["api", "parity", "regression", "http", "grpc", "cli", "testing"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -29,6 +29,9 @@ dependencies = [
     "deepdiff>=7.0",
     "jsonpath-ng>=1.6.0",
     "rich>=13.0",
+    "grpcio>=1.60.0",
+    "grpcio-tools>=1.60.0",
+    "protobuf>=4.25.0",
 ]
 
 [project.optional-dependencies]

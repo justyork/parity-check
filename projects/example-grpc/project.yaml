@@ -1,0 +1,14 @@
+name: example-grpc
+base:
+  left: http://127.0.0.1:8080
+  right: 127.0.0.1:50051
+defaults:
+  timeout_sec: 30
+  sides:
+    left: http
+    right: grpc
+  headers:
+    Accept: application/json
+grpc:
+  proto_dir: proto
+  json_preserving_proto_field_name: true

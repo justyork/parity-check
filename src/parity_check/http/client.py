@@ -2,6 +2,7 @@ from typing import Any
 from urllib.parse import urlencode, urljoin
 
 from parity_check.config.models import HttpMethod, ProjectConfig, RequestConfig, SideOverride
+from parity_check.errors import ConfigError
 
 
 def _merge_headers(
@@ -52,6 +53,16 @@ def resolve_side_request(
 ) -> tuple[str, HttpMethod, dict[str, str], dict[str, str], Any | None]:
     base_url = project.base.left if side == "left" else project.base.right
     override = request.left if side == "left" else request.right
+
+    if request.method is None:
+        raise ConfigError(
+            f"Request '{request.id}' uses HTTP on side '{side}' but has no 'method'"
+        )
+    has_path = request.path is not None or (override and (override.path or override.url))
+    if not has_path:
+        raise ConfigError(
+            f"Request '{request.id}' uses HTTP on side '{side}' but has no 'path'"
+        )
 
     query = _merge_query(request.query, override.query if override else None)
     headers = _merge_headers(

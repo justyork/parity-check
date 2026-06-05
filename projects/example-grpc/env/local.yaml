@@ -1,0 +1,5 @@
+base:
+  left: http://127.0.0.1:8080
+  right: 127.0.0.1:50051
+vars:
+  NAME: world

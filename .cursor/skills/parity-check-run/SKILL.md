@@ -1,15 +1,15 @@
 ---
 name: parity-check-run
 description: >-
-  Installs and runs the parity-check CLI to compare HTTP responses (left vs right),
-  debug a single service, manage env/variables, and inspect run artifacts. Use when
-  working with parity-check, API parity, legacy vs new implementation regression,
-  list/run commands, --env, --side, --output-dir.
+  Installs and runs the parity-check CLI to compare HTTP and gRPC responses (left vs
+  right), debug a single service, manage env/variables, and inspect run artifacts. Use
+  when working with parity-check, API parity, legacy vs new implementation regression,
+  HTTP vs gRPC migration, list/run commands, --env, --side, --output-dir.
 ---
 
 # parity-check: run and debug
 
-The CLI compares HTTP responses from two APIs (**left** — usually legacy, **right** — new implementation). One yaml file = one HTTP request; expected responses are not defined in yaml — the tool compares actual responses.
+The CLI compares responses from two APIs (**left** — usually legacy, **right** — new implementation). Each side speaks HTTP or gRPC, so a request can compare HTTP vs HTTP, gRPC vs gRPC, or HTTP vs gRPC (the typical migration case). One yaml file = one request; expected responses are not defined in yaml — the tool compares actual responses.
 
 ## Installation
 
@@ -154,9 +154,22 @@ parity-check run -p my-api -e dev -r my-request
 
 **Request chains:** `flows.yaml` in a project is reference-only (shared `user_id` across steps); the CLI does not run flows automatically yet — run steps individually or via an external script.
 
+## gRPC and mixed HTTP/gRPC
+
+A side is gRPC when `left.protocol` / `right.protocol` or `defaults.sides.<side>` is `grpc`; otherwise HTTP. The common setup is HTTP on the left (legacy) and gRPC on the right (new service).
+
+- Put `.proto` files under `projects/<name>/proto/` (or set `grpc.proto_dir`). Install with `pip install -e ".[dev]"` so `grpcio` / `grpcio-tools` are present.
+- For a gRPC side, `base.<side>` is a target (`host:port`, optionally `grpc://host:port`), not a URL.
+- gRPC status is normalized to an HTTP code for comparison (`OK` -> 200, `NOT_FOUND` -> 404, ...); the response message is compared as JSON.
+- `--side right` debug and `--output-dir` work for gRPC too; snapshots carry `protocol` and `raw_status`.
+- `host` note: prefer `127.0.0.1` over `localhost` for a local gRPC target to avoid IPv4/IPv6 resolution mismatches.
+
+See the request format in skill `parity-check-author-requests` and [docs/request-schema.md](../../docs/request-schema.md).
+
 ## Comparison rules (what to expect in output)
 
-- HTTP status and body are compared; response headers are not.
+- Status and body are compared; response headers / gRPC metadata are not.
+- gRPC responses are compared as JSON; an empty gRPC message equals an empty HTTP body.
 - JSON: object key order does not matter; array element order does.
 - `ignore_paths` — JSONPath fields excluded from body comparison.
 - On JSON parse failure — compare as text.

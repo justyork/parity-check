@@ -15,3 +15,4 @@ output/
 .vscode/
 projects/*
 !projects/example
+!projects/example-grpc

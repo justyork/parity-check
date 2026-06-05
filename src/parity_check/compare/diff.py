@@ -6,7 +6,7 @@ from deepdiff import DeepDiff
 
 from parity_check.compare.jsonpath_ignore import apply_ignore_paths
 from parity_check.compare.normalize import normalize_json
-from parity_check.http.runner import HttpResponse
+from parity_check.transport.response import SideResponse
 
 
 @dataclass(frozen=True)
@@ -29,6 +29,14 @@ def _parse_body(body_text: str) -> tuple[Any | None, str]:
         return json.loads(body_text), "json"
     except json.JSONDecodeError:
         return body_text, "text"
+
+
+def _is_empty_body(parsed: Any | None, body_format: str) -> bool:
+    if body_format == "empty":
+        return True
+    if body_format == "json":
+        return parsed in (None, {}, [])
+    return False
 
 
 def _format_for_diff(value: Any, body_format: str) -> str:
@@ -68,9 +76,18 @@ def _build_unified_style_diff(
     return "".join(diff_lines)
 
 
+def _mixed_status_details(left: SideResponse, right: SideResponse) -> list[str]:
+    if left.protocol == right.protocol:
+        return []
+    return [
+        f"status: {left.protocol} {left.display_status} "
+        f"vs {right.protocol} {right.display_status}"
+    ]
+
+
 def compare_responses(
-    left: HttpResponse,
-    right: HttpResponse,
+    left: SideResponse,
+    right: SideResponse,
     ignore_paths: list[str] | None = None,
 ) -> ComparisonResult:
     ignore_paths = ignore_paths or []
@@ -79,10 +96,23 @@ def compare_responses(
     left_parsed, left_format = _parse_body(left.body_text)
     right_parsed, right_format = _parse_body(right.body_text)
 
+    extra_details = [] if status_equal else _mixed_status_details(left, right)
+
+    if _is_empty_body(left_parsed, left_format) and _is_empty_body(right_parsed, right_format):
+        return ComparisonResult(
+            equal=status_equal,
+            status_equal=status_equal,
+            body_equal=True,
+            left_status=left.status_code,
+            right_status=right.status_code,
+            body_format="empty",
+            details=extra_details,
+        )
+
     if left_format != right_format:
         body_equal = left.body_text == right.body_text
         body_diff_text = _build_unified_style_diff(left.body_text, right.body_text)
-        details = [f"body format mismatch: {left_format} vs {right_format}"]
+        details = [*extra_details, f"body format mismatch: {left_format} vs {right_format}"]
         return ComparisonResult(
             equal=status_equal and body_equal,
             status_equal=status_equal,
@@ -107,6 +137,7 @@ def compare_responses(
             right_status=right.status_code,
             body_diff_text=body_diff_text,
             body_format="text",
+            details=extra_details,
         )
 
     left_filtered = apply_ignore_paths(left_parsed, ignore_paths)
@@ -134,4 +165,5 @@ def compare_responses(
         right_status=right.status_code,
         body_diff_text=body_diff_text,
         body_format="json",
+        details=extra_details,
     )

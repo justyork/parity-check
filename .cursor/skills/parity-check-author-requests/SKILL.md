@@ -1,10 +1,11 @@
 ---
 name: parity-check-author-requests
 description: >-
-  Generates parity-check HTTP request YAML (project.yaml, env/*.yaml,
-  requests/*.yaml) from OpenAPI, curl, code, or API descriptions. Use when creating
-  parity tests, request yaml to compare two services, ignore_paths, or left/right
-  overrides — including from another repository without knowing the parity-check tool.
+  Generates parity-check HTTP and gRPC request YAML (project.yaml, env/*.yaml,
+  requests/*.yaml) from OpenAPI, proto, curl, code, or API descriptions. Use when
+  creating parity tests, request yaml to compare two services (including HTTP vs gRPC
+  migration), ignore_paths, or left/right overrides — including from another repository
+  without knowing the parity-check tool.
 ---
 
 # parity-check: request authoring (YAML)
@@ -54,9 +55,12 @@ defaults:
 | Field | Required | Description |
 |-------|----------|-------------|
 | `name` | yes | Project name = directory name |
-| `base.left`, `base.right` | yes | Base URL with no trailing `/` |
-| `defaults.timeout_sec` | no | HTTP timeout (default 30) |
-| `defaults.headers` | no | Headers shared by all requests |
+| `base.left`, `base.right` | yes | Base URL (HTTP) or target `host:port` (gRPC), no trailing `/` |
+| `defaults.timeout_sec` | no | Timeout / gRPC deadline (default 30) |
+| `defaults.headers` | no | Headers shared by all HTTP requests |
+| `defaults.sides.left`, `defaults.sides.right` | no | Protocol per side: `http` (default) or `grpc` |
+| `grpc.proto_dir` | no | `.proto` directory, relative to project (default `proto`) |
+| `grpc.json_preserving_proto_field_name` | no | Keep snake_case proto field names (default `true`) |
 
 ## `env/<environment>.yaml`
 
@@ -80,11 +84,12 @@ Secrets go in `.env` (do not commit); team-shared values go in `vars`.
 | Field | Required | Description |
 |-------|----------|-------------|
 | `id` | yes* | Request id (*or from file name) |
-| `method` | yes | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD` |
-| `path` | yes | Path relative to base; must start with `/` |
+| `method` | HTTP only | `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD` (required for an HTTP side) |
+| `path` | HTTP only | Path relative to base; must start with `/` (required for an HTTP side) |
 | `body` | no | Body; for JSON — YAML object or array |
 | `query` | no | All values must be **strings** |
 | `headers` | no | Extra headers (merged over `defaults.headers`) |
+| `grpc` | gRPC only | Shared gRPC call: `service`, `method`, `message`, `metadata` |
 | `left`, `right` | no | `SideOverride` only when sides differ |
 | `ignore_paths` | no | JSONPath excluded from body comparison |
 | `tags` | no | String or list of tags for `parity-check run --tag` |
@@ -95,11 +100,13 @@ Secrets go in `.env` (do not commit); team-shared values go in `vars`.
 
 | Field | Purpose |
 |-------|---------|
-| `url` | Full URL instead of `base + path` |
-| `path` | Side-specific path |
-| `headers` | Extra side headers |
-| `body` | Side-specific body |
-| `query` | Extra query parameters |
+| `url` | Full URL instead of `base + path` (HTTP) |
+| `path` | Side-specific path (HTTP) |
+| `headers` | Extra side headers (HTTP) |
+| `body` | Side-specific body (HTTP) |
+| `query` | Extra query parameters (HTTP) |
+| `protocol` | `http` or `grpc` for this side (overrides `defaults.sides`) |
+| `grpc` | gRPC call or per-side overrides: `service`, `method`, `message`, `metadata` |
 
 Shared values at the top level; overrides only where left ≠ right.
 
@@ -147,6 +154,45 @@ tags:
 ```
 
 CLI: `--tag smoke` runs requests that have tag `smoke`; multiple `-t` flags use OR (any match).
+
+### gRPC and mixed HTTP/gRPC
+
+Each side is `http` or `grpc`, resolved from `left.protocol` / `right.protocol`, then `defaults.sides.<side>`, then `http`. The main case is HTTP left (legacy) vs gRPC right (new service).
+
+- Add `.proto` files under `projects/<name>/proto/`. For a gRPC side, `base.<side>` is a target (`host:port`).
+- `grpc` block fields: `service` (fully-qualified, e.g. `myapi.v1.UserService`), `method` (RPC name), `message` (JSON object, supports `${VAR}`), `metadata` (map). Set shared `grpc` at request level; refine per side under `left.grpc` / `right.grpc` (service/method/message replace, metadata merges).
+- Comparison: gRPC status is normalized to HTTP (`OK` -> 200, `NOT_FOUND` -> 404, ...); the response message is compared as JSON with the same `ignore_paths`. There is no automatic field mapping — align `body` (HTTP) and `grpc.message` (gRPC) yourself and drop differing field names with `ignore_paths`.
+
+```yaml
+# file: projects/example-grpc/project.yaml
+name: example-grpc
+base:
+  left: http://localhost:8080
+  right: localhost:50051
+defaults:
+  sides:
+    left: http
+    right: grpc
+grpc:
+  proto_dir: proto
+```
+
+```yaml
+# file: projects/example-grpc/requests/say-hello.yaml
+id: say-hello
+method: GET
+path: /hello
+query:
+  name: world
+right:
+  grpc:
+    service: parity.example.v1.Greeter
+    method: SayHello
+    message:
+      name: world
+ignore_paths:
+  - $.code
+```
 
 ### `ignore_paths`
 

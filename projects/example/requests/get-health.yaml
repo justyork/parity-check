@@ -1,6 +1,10 @@
 id: get-health
 method: GET
 path: /health
+left:
+  path: /health/legacy
+right:
+  path: /health/v2
 tags:
   - smoke
 query:
